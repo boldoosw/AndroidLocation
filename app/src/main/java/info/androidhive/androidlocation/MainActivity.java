@@ -45,6 +45,7 @@ import java.text.DateFormat;
 import java.util.Date;
 
 import butterknife.BindView;
+import butterknife.BuildConfig;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 
