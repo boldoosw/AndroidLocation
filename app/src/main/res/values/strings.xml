@@ -3,4 +3,7 @@
     <string name="start_updates">Байршил заагч асаах</string>
     <string name="stop_updates">Байршил заагч унтраах</string>
     <string name="get_last_location">Хамгийн сүүлийн байршил</string>
+
+    <string name="api_key">AIzaSyC3RwBupXyFdul5XtIAWjDsF9f8ogyLam4</string>
+    <string name="base_url">https://maps.googleapis.com</string>
 </resources>

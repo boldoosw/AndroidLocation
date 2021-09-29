@@ -3,10 +3,13 @@ package info.androidhive.androidlocation;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
+import android.location.LocationListener;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
@@ -30,10 +33,19 @@ import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.maps.android.PolyUtil;
 import com.karumi.dexter.Dexter;
 import com.karumi.dexter.PermissionToken;
 import com.karumi.dexter.listener.PermissionDeniedResponse;
@@ -48,12 +60,25 @@ import butterknife.BindView;
 import butterknife.BuildConfig;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
+import info.androidhive.androidlocation.model.DirectionResponses;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.GET;
+import retrofit2.http.Query;
 
 /**
  * Reference: https://github.com/googlesamples/android-play-location/tree/master/LocationUpdates
  */
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, LocationListener {
+
+    private GoogleMap map;
+    MarkerOptions markerDestLocation;
+    private LatLng currentLatLng,oldDestLatLng;
+    Double lat1,long1;
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -100,11 +125,15 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
+        lat1 = Double.parseDouble("47.9157397");
+
+        long1 = Double.parseDouble("106.9189875");
         // initialize the necessary libraries
         init();
 
         // restore the values from saved instance state
         restoreValuesFromBundle(savedInstanceState);
+
     }
 
     private void init() {
@@ -122,6 +151,13 @@ public class MainActivity extends AppCompatActivity {
                 updateLocationUI();
             }
         };
+
+
+
+        if(currentLatLng!=null)
+            currentLatLng = new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude());
+        else
+            currentLatLng = new LatLng(lat1, long1);
 
         mRequestingLocationUpdates = false;
 
@@ -175,7 +211,11 @@ public class MainActivity extends AppCompatActivity {
             // location last updated time
             txtUpdatedOn.setText("Last updated on: " + mLastUpdateTime);
         }
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.maps_view);
+        if (mapFragment != null) {
+            mapFragment.getMapAsync(this);
 
+        }
         toggleButtons();
     }
 
@@ -365,6 +405,92 @@ public class MainActivity extends AppCompatActivity {
         if (mRequestingLocationUpdates) {
             // pausing location updates
             stopLocationUpdates();
+        }
+    }
+
+    @Override
+    public void onLocationChanged(@NonNull Location location) {
+
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        map = googleMap;
+
+        MarkerOptions markerCurrentLocation = new MarkerOptions()
+                .position(currentLatLng)
+                .title("CurrentLocation");
+
+        map.addMarker(markerCurrentLocation);
+
+        map.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLatLng, 13f));
+
+        final String currentLocation = String.valueOf(currentLatLng.latitude) + "," + String.valueOf(currentLatLng.longitude);
+
+        map.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(@NonNull LatLng latLng) {
+
+
+                map.clear();
+                markerDestLocation = new MarkerOptions().position(
+                        latLng)
+                        .title("destLocation ");
+
+                markerDestLocation.icon(BitmapDescriptorFactory
+                        .defaultMarker(BitmapDescriptorFactory.HUE_AZURE));
+
+                map.addMarker(markerDestLocation);
+
+                String destLocation=String.valueOf(markerDestLocation.position(latLng).getPosition().latitude) + "," + String.valueOf(markerDestLocation.position(latLng).getPosition().longitude);
+
+                ApiServices apiServices = RetrofitClient.apiServices(MainActivity.this);
+
+                apiServices.getDirection(currentLocation, destLocation, getString(R.string.api_key))
+                        .enqueue(new Callback<DirectionResponses>() {
+                            @Override
+                            public void onResponse(@NonNull Call<DirectionResponses> call, @NonNull Response<DirectionResponses> response) {
+                                drawPolyline(response);
+                                Log.d("bisa dong oke", response.message());
+                            }
+
+                            @Override
+                            public void onFailure(@NonNull Call<DirectionResponses> call, @NonNull Throwable t) {
+                                Log.e("anjir error", t.getLocalizedMessage());
+                            }
+                        });
+
+
+            }
+        });
+    }
+    private void drawPolyline(@NonNull Response<DirectionResponses> response) {
+        if (response.body() != null) {
+            String shape = response.body().getRoutes().get(0).getOverviewPolyline().getPoints();
+            PolylineOptions polyline = new PolylineOptions()
+                    .addAll(PolyUtil.decode(shape))
+                    .width(8f)
+                    .color(Color.RED);
+            map.addPolyline(polyline);
+        }
+
+
+    }
+    private interface ApiServices {
+        @GET("maps/api/directions/json")
+        Call<DirectionResponses> getDirection(@Query("origin") String origin,
+                                              @Query("destination") String destination,
+                                              @Query("key") String apiKey);
+    }
+
+    private static class RetrofitClient {
+        static ApiServices apiServices(Context context) {
+            Retrofit retrofit = new Retrofit.Builder()
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .baseUrl(context.getResources().getString(R.string.base_url))
+                    .build();
+
+            return retrofit.create(ApiServices.class);
         }
     }
 }

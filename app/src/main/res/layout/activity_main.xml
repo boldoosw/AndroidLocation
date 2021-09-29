@@ -52,4 +52,12 @@
         android:layout_marginTop="30dp"
         android:textSize="11dp" />
 
+    <fragment xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/maps_view"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".Home" />
+
 </LinearLayout>
